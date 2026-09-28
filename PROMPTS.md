@@ -1,6 +1,6 @@
 # Agent 判断层提示词设计
 
-> 当前状态：设计稿。下列模板尚未接入模型 API。`developer`、`user` 表示两条独立的消息；若模型提供方只支持 `system`，将固定指令放入 `system` 消息。XML 标签用于标识消息内部的内容边界，输出仍为 JSON。
+> 当前状态：已接入 `arti/decision.py`。运行时直接读取本文三个固定角色提示词。百炼兼容接口使用 `system`、`user` 两条独立消息；XML 标签用于标识消息内部的内容边界，输出仍为 JSON。
 
 本设计参考 [OpenAI 提示词工程文档](https://developers.openai.com/api/docs/guides/prompt-engineering)中角色、指令与上下文分离的方式，以及[结构化输出文档](https://developers.openai.com/api/docs/guides/structured-outputs)中的 schema 约束。TradingAgents 的多角色研究思路用于双 Agent 模式；本项目的判断对象是预测市场异动，不是股票交易决策。
 

@@ -1,6 +1,25 @@
 # ARTI：预测市场数据源与分析框架
 
-> 当前状态：架构设计。本文描述计划实现的系统和数据契约；项目代码、命令与 GitHub 发布尚未完成。
+> 当前状态：第一版已实现。ARTI 使用上层 `agent-development` 的统一 `uv` 项目和 `.env`。
+
+## 运行
+
+从上层目录运行（依赖使用根目录 `pyproject.toml` 和 `.venv`）：
+
+```bash
+cd /Users/yxb/OpenAI/agent-development
+uv sync
+PYTHONPATH=ARTI uv run python -m arti.cli --limit 20 --mode none --output ARTI/report.json
+PYTHONPATH=ARTI uv run python -m arti.cli --limit 20 --mode single --model qwen3.8-flash
+PYTHONPATH=ARTI uv run python -m arti.cli --limit 5 --mode debate --model qwen3.8-flash
+PYTHONPATH=ARTI uv run pytest -q ARTI/tests
+```
+
+`--mode none` 只抓取与分析；`single` 每个合格市场调用一次模型，`debate` 调用四次。模型使用上层 `.env` 中的 `DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`；名称可通过 `--model` 或 `ARTI_MODEL` 指定。缺少配置或调用失败时，报告保留数据与分析，并填写 `assessment_error`。默认快照库为 `ARTI/arti.sqlite3`。重复运行后才可能获得 5 分钟、1 小时、24 小时变化；可以用 `--poll-count 2 --interval 300` 连续采样。`--platforms` 可限制平台，`--jump-pp` 调整跳变阈值。报告按平台分别排序。
+
+若只检出 ARTI 仓库，仍可不创建子项目环境，从 ARTI 目录用 `uv run --no-project --with 'pydantic>=2' --with 'openai>=3' --with python-dotenv python -m arti.cli --limit 20` 运行。此时 `.env` 仍放在 ARTI 的上层目录，模型模式另加 `--mode` 和 `--model`。测试可在同一命令中把 `python -m arti.cli ...` 换成 `--with pytest pytest -q tests`。
+
+公开 API 是只读的；抓取失败记录在 `fetch_errors` 与标准错误。首次运行通常显示 `insufficient_history`。部分信号依赖多次等间隔快照。报告仅供研究与人工复核。
 
 ARTI 面向 Polymarket 和 Kalshi 的公开预测市场数据。它定期获取市场行情，保存可比较的历史快照，用确定性的程序筛选市场、追踪概率变化并检测异常，最后由可选择的 Agent 工作流汇总证据，形成可追溯的观察结论。
 
@@ -171,12 +190,11 @@ change_pp = (当前 yes_probability - 历史 yes_probability) × 100
 }
 ```
 
-## 计划实现的项目结构
+## 项目结构
 
 ```text
 ARTI/
-├── pyproject.toml             # Python 依赖与 uv 项目配置
-├── src/arti/
+├── arti/
 │   ├── adapters/              # Polymarket、Kalshi 数据接入
 │   ├── models.py              # 统一数据与报告模型
 │   ├── storage.py             # SQLite 快照
@@ -188,13 +206,13 @@ ARTI/
 
 ## 实施顺序与验收
 
-1. 建立 `uv` 项目、统一模型和两个公开 API 适配器。
+1. 使用上层统一 `uv` 项目，建立统一模型和两个公开 API 适配器。
 2. 保存快照，实现市场筛选、概率追踪和异常检测。
 3. 按 [PROMPTS.md](PROMPTS.md) 实现单 Agent 与一轮双 Agent 辩论，使用分角色消息、XML 分段内容和统一的结构化输出校验。
 4. 用固定样本测试字段转换和分析计算，再对公开 API 做只读连通性检查。
 5. 补充可实际运行的安装、命令和样例，并发布 GitHub。
 
-完成后，应能从两个平台读取开放市场，连续抓取后计算概率变化；配置模型后，可选择 `single` 或 `debate` 生成符合相同契约的判断报告，并通过 `uv run pytest`。模型不可用时只输出数据与分析结果，明确标记判断未生成。当前 README 先确认架构；命令和真实运行结果会在实现后补充。
+已用固定样本验证字段转换、快照窗口与结构化输出引用，并对两个公开 API 完成只读连通性检查。模型不可用时只输出数据与分析结果，明确标记判断未生成。
 
 ## 边界
 

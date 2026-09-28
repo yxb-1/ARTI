@@ -14,7 +14,7 @@ from pydantic import Field, ValidationError
 
 from .adapters import fetch_markets
 from .analysis import analyze, evidence_bundle
-from .decision import assess
+from .decision import DebateFailure, assess
 from .models import Report, StrictModel
 from .storage import SnapshotStore
 
@@ -100,8 +100,14 @@ def run(args):
                         print(f"Assessing {market.market_id} ({args.mode})...", file=sys.stderr, flush=True)
                         report.assessment, report.debate_turns = assess(evidence_bundle(market, history, analysis), args.mode, client, model)
                     except Exception as exc:
-                        error = f"{type(exc).__name__}: {exc}"
-                        if _provider_rejected_content(exc):
+                        if isinstance(exc, DebateFailure):
+                            report.debate_turns = exc.turns
+                            cause = exc.cause
+                            error = f"{exc.phase}: {type(cause).__name__}: {cause}"
+                        else:
+                            cause = exc
+                            error = f"{type(exc).__name__}: {exc}"
+                        if _provider_rejected_content(cause):
                             report.assessment_error = error
                             skipped_assessments.append(report.model_dump(mode="json"))
                             print(f"Provider rejected {market.market_id}; trying next candidate", file=sys.stderr, flush=True)

@@ -109,7 +109,27 @@ def analyze(market: Market, history: list[Market], *, jump_pp: float = 8, max_st
 
 
 def evidence_bundle(market: Market, history: list[Market], analysis: Analysis) -> EvidenceBundle:
-    items = [EvidenceItem(id="metric:yes_probability", value=market.yes_probability, unit="probability", source=market.price_source or "missing")]
+    items = []
+    for field, unit in (
+        ("yes_probability", "probability"), ("yes_bid", "probability"), ("yes_ask", "probability"),
+        ("volume_total", market.volume_unit), ("volume_24h", market.volume_unit),
+        ("liquidity", market.liquidity_unit),
+    ):
+        value = getattr(market, field)
+        if value is not None:
+            items.append(EvidenceItem(id=f"metric:{field}", value=value, unit=unit,
+                                      source=(market.price_source or "market_snapshot") if field == "yes_probability" else "market_snapshot"))
+    if market.yes_bid is not None and market.yes_ask is not None:
+        items.append(EvidenceItem(id="metric:yes_spread", value=market.yes_ask - market.yes_bid,
+                                  unit="probability", source="market_snapshot"))
+    items.extend((
+        EvidenceItem(id="quality:data_quality", value=analysis.data_quality, source="analysis"),
+        EvidenceItem(id="quality:history_sample_count", value=len(history), unit="snapshots", source="snapshot_history"),
+        EvidenceItem(id="quality:available_change_windows", value=",".join(analysis.changes) or "none",
+                     source="analysis"),
+    ))
+    for issue in analysis.quality_issues:
+        items.append(EvidenceItem(id=f"quality:issue:{issue}", value=issue, source="analysis"))
     for key, change in analysis.changes.items():
         items.append(EvidenceItem(id=f"change:{key}", value=change.change_pp, unit="percentage_points",
                                   window_minutes=change.window_minutes, source="snapshot_history"))

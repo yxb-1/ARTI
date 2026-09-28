@@ -6,7 +6,7 @@ import pytest
 
 from arti.adapters import kalshi_record, polymarket_record
 from arti.analysis import analyze, evidence_bundle
-from arti.decision import assess
+from arti.decision import DebateFailure, assess
 from arti.models import AgentAssessment, Market
 from arti.storage import SnapshotStore
 
@@ -80,9 +80,11 @@ def test_volume_spike_requires_comparable_baseline():
 class FakeClient:
     def __init__(self, payloads):
         self.payloads = iter(payloads)
+        self.calls = []
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
 
     def create(self, **kwargs):
+        self.calls.append(kwargs)
         return SimpleNamespace(choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(content=json.dumps(next(self.payloads)), refusal=None))])
 
 
@@ -92,8 +94,12 @@ def test_single_and_debate_contracts():
     base = {"as_of": NOW.isoformat(), "status": "watch", "summary": "Observe.",
             "supporting_evidence": ["metric:yes_probability"], "counter_evidence": [],
             "open_questions": [], "risks": [], "cited_signals": []}
-    single, turns = assess(bundle, "single", FakeClient([{**base, "mode": "single"}]), "test")
+    client = FakeClient([{**base, "mode": "single"}])
+    single, turns = assess(bundle, "single", client, "test")
     assert single.mode == "single" and turns == []
+    schema = client.calls[0]["response_format"]["json_schema"]["schema"]
+    assert "metric:yes_probability" in schema["properties"]["supporting_evidence"]["items"]["enum"]
+    assert schema["properties"]["cited_signals"]["maxItems"] == 0
     phases = ["opening", "challenge", "reply"]
     payloads = [{"phase": phase, "position": "uncertain", "claims": [{"text": "price", "evidence_ids": ["metric:yes_probability"]}],
                  "limitations": [], "questions": []} for phase in phases]
@@ -101,6 +107,19 @@ def test_single_and_debate_contracts():
     assert verdict.mode == "debate" and [t.phase for t in turns] == phases
     with pytest.raises(ValueError, match="unknown evidence"):
         assess(bundle, "single", FakeClient([{**base, "mode": "single", "supporting_evidence": ["invented"]}]), "test")
+
+
+def test_debate_failure_preserves_validated_turns():
+    item = market()
+    bundle = evidence_bundle(item, [], analyze(item, []))
+    opening = {"phase": "opening", "position": "observe", "claims": [{"text": "price", "evidence_ids": ["metric:yes_probability"]}],
+               "limitations": [], "questions": []}
+    challenge = {"phase": "challenge", "position": "uncertain", "claims": [{"text": "missing history", "evidence_ids": ["invented"]}],
+                 "limitations": [], "questions": []}
+    with pytest.raises(DebateFailure) as caught:
+        assess(bundle, "debate", FakeClient([opening, challenge]), "test")
+    assert caught.value.phase == "challenge"
+    assert [turn.phase for turn in caught.value.turns] == ["opening"]
 
 
 def test_cli_selects_ranked_candidate(tmp_path, monkeypatch):
@@ -166,3 +185,24 @@ def test_provider_rejection_tries_next_candidate(tmp_path, monkeypatch):
     assert result["reports"][0]["market"]["market_id"] == "polymarket:TWO"
     assert result["skipped_assessments"][0]["market"]["market_id"] == "polymarket:ONE"
     assert "provider refused" in result["skipped_assessments"][0]["assessment_error"]
+
+
+def test_debate_report_keeps_turns_after_later_failure(tmp_path, monkeypatch):
+    from arti import cli
+    import openai
+    opening = {"phase": "opening", "position": "observe", "claims": [{"text": "price", "evidence_ids": ["metric:yes_probability"]}],
+               "limitations": [], "questions": []}
+    challenge = {"phase": "challenge", "position": "uncertain", "claims": [{"text": "unsupported", "evidence_ids": ["invented"]}],
+                 "limitations": [], "questions": []}
+    fake_client = FakeClient([opening, challenge])
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: fake_client)
+    monkeypatch.setattr(cli, "fetch_markets", lambda platform, limit: ([market()], []))
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    monkeypatch.setenv("DASHSCOPE_BASE_URL", "https://example.com")
+    args = SimpleNamespace(db=tmp_path / "db.sqlite3", mode="debate", model="test", poll_count=1,
+                           platforms=["kalshi"], limit=1, jump_pp=8, output=tmp_path / "report.json", interval=1)
+    assert cli.run(args) == 0
+    report = json.loads(args.output.read_text())["reports"][0]
+    assert report["assessment"] is None
+    assert [turn["phase"] for turn in report["debate_turns"]] == ["opening"]
+    assert "challenge: ValueError: unknown evidence IDs" in report["assessment_error"]

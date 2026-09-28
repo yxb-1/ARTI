@@ -25,6 +25,8 @@ PYTHONPATH=ARTI uv run pytest -q ARTI/tests
 
 `qwen3.8-*` 结构化判断请求关闭思考模式，以缩短响应时间。提供方的内容审查拒绝会保留在 `assessment_error`，不会生成替代判断。
 
+判断输入提供可引用的报价、成交量、流动性、历史样本数、数据质量、变化和信号 ID。API JSON Schema 对引用字段限定合法 ID，程序再次校验。`debate` 成功时前三轮保存在 `debate_turns`，第四轮结论保存在 `assessment`；若中途失败，已通过校验的轮次仍保存在 `debate_turns`，出错阶段和原因写入 `assessment_error`。
+
 ARTI 面向 Polymarket 和 Kalshi 的公开预测市场数据。它定期获取市场行情，保存可比较的历史快照，用确定性的程序筛选市场、追踪概率变化并检测异常，最后由可选择的 Agent 工作流汇总证据，形成可追溯的观察结论。
 
 项目借鉴 [TradingAgents](https://github.com/tauricresearch/tradingagents) 将数据分析与最终判断分工、以及让不同立场相互质疑的思路。第一版聚焦预测市场，提供单 Agent 和一轮双 Agent 辩论两种判断模式。

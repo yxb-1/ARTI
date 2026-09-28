@@ -7,27 +7,48 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
+from pydantic import Field, ValidationError
 
 from .adapters import fetch_markets
 from .analysis import analyze, evidence_bundle
 from .decision import assess
-from .models import Report
+from .models import Report, StrictModel
 from .storage import SnapshotStore
 
 ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CONFIG = ROOT / "ARTI" / "config.json"
+
+
+class RunSettings(StrictModel):
+    platforms: list[Literal["polymarket", "kalshi"]] = Field(min_length=1)
+    mode: Literal["none", "single", "debate"]
+    model: str | None
+    limit: int = Field(gt=0)
+    db: str
+    output: str
+    jump_pp: float = Field(gt=0)
+    poll_count: int = Field(gt=0)
+    interval: int = Field(gt=0)
+
+
+def _workspace_path(value: str) -> Path:
+    path = Path(value).expanduser()
+    return path if path.is_absolute() else ROOT / path
 
 
 def run(args):
     load_dotenv(ROOT / ".env")
-    store = SnapshotStore(args.db)
+    store = SnapshotStore(_workspace_path(args.db))
     client = None
     model = args.model or os.getenv("ARTI_MODEL")
     if args.mode != "none" and model and os.getenv("DASHSCOPE_API_KEY") and os.getenv("DASHSCOPE_BASE_URL"):
         from openai import OpenAI
         client = OpenAI(api_key=os.environ["DASHSCOPE_API_KEY"], base_url=os.environ["DASHSCOPE_BASE_URL"], timeout=30, max_retries=0)
     reports = []
+    all_fetch_errors = []
     for _ in range(args.poll_count):
         candidates, fetch_errors = [], []
         for platform in args.platforms:
@@ -41,6 +62,7 @@ def run(args):
                 fetch_errors.extend(errors)
         for error in fetch_errors:
             print(error, file=sys.stderr)
+        all_fetch_errors.extend(fetch_errors)
         histories = {market.market_id: store.history(market.market_id, market.observed_at) for market in candidates}
         analyses = {market.market_id: analyze(market, histories[market.market_id], jump_pp=args.jump_pp) for market in candidates}
         store.save(candidates)
@@ -72,29 +94,45 @@ def run(args):
         if args.poll_count > 1 and _ < args.poll_count - 1:
             time.sleep(args.interval)
     reports.sort(key=lambda x: (x.market.platform, -(x.analysis.attention_score or 0)))
-    result = {"reports": [r.model_dump(mode="json") for r in reports], "fetch_errors": fetch_errors}
+    settings = {key: str(getattr(args, key)) if isinstance(getattr(args, key), Path) else getattr(args, key)
+                for key in RunSettings.model_fields}
+    result = {"settings": settings, "reports": [r.model_dump(mode="json") for r in reports], "fetch_errors": all_fetch_errors}
     output = json.dumps(result, ensure_ascii=False, indent=2)
-    if args.output:
-        Path(args.output).write_text(output + "\n", encoding="utf-8")
-    else:
-        print(output)
+    output_path = _workspace_path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(output + "\n", encoding="utf-8")
+    print(f"Report saved to {output_path}", file=sys.stderr)
     return 0 if reports else 1
 
 
-def main():
+def parse_args(argv=None):
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    config_args, _ = config_parser.parse_known_args(argv)
+    config_path = Path(config_args.config).expanduser()
+    try:
+        settings = RunSettings.model_validate_json(config_path.read_text(encoding="utf-8"))
+    except (OSError, ValidationError) as exc:
+        config_parser.error(f"cannot load config {config_path}: {exc}")
     parser = argparse.ArgumentParser(description="ARTI public prediction market monitor")
-    parser.add_argument("--platforms", nargs="+", choices=["polymarket", "kalshi"], default=["polymarket", "kalshi"])
-    parser.add_argument("--mode", choices=["none", "single", "debate"], default="none")
-    parser.add_argument("--model", help="model name; defaults to ARTI_MODEL from environment")
-    parser.add_argument("--limit", type=int, default=20, help="market count per platform")
-    parser.add_argument("--db", default=str(ROOT / "ARTI" / "arti.sqlite3"))
-    parser.add_argument("--output")
-    parser.add_argument("--jump-pp", type=float, default=8)
-    parser.add_argument("--poll-count", type=int, default=1)
-    parser.add_argument("--interval", type=int, default=300)
-    args = parser.parse_args()
+    parser.add_argument("--config", default=str(DEFAULT_CONFIG), help="JSON settings file")
+    parser.add_argument("--platforms", nargs="+", choices=["polymarket", "kalshi"], default=settings.platforms)
+    parser.add_argument("--mode", choices=["none", "single", "debate"], default=settings.mode)
+    parser.add_argument("--model", default=settings.model, help="model name")
+    parser.add_argument("--limit", type=int, default=settings.limit, help="selected markets per platform")
+    parser.add_argument("--db", default=settings.db)
+    parser.add_argument("--output", default=settings.output, help="JSON report path")
+    parser.add_argument("--jump-pp", type=float, default=settings.jump_pp)
+    parser.add_argument("--poll-count", type=int, default=settings.poll_count)
+    parser.add_argument("--interval", type=int, default=settings.interval)
+    args = parser.parse_args(argv)
     if args.limit < 1 or args.poll_count < 1 or args.interval < 1 or args.jump_pp <= 0:
         parser.error("limit, poll-count, interval, and jump-pp must be positive")
+    return args
+
+
+def main():
+    args = parse_args()
     raise SystemExit(run(args))
 
 

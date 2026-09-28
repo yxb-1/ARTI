@@ -114,3 +114,16 @@ def test_cli_selects_ranked_candidate(tmp_path, monkeypatch):
     assert cli.run(args) == 0
     report = json.loads(args.output.read_text())
     assert [r["market"]["market_id"] for r in report["reports"]] == ["kalshi:STRONG"]
+    assert report["settings"]["limit"] == 1
+
+
+def test_json_config_and_cli_override(tmp_path):
+    from arti import cli
+    config = {"platforms": ["kalshi"], "mode": "single", "model": "qwen3.8-flash", "limit": 2,
+              "db": "ARTI/history.sqlite3", "output": "ARTI/report.json", "jump_pp": 8,
+              "poll_count": 1, "interval": 300}
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(config), encoding="utf-8")
+    args = cli.parse_args(["--config", str(path)])
+    assert args.mode == "single" and args.output == "ARTI/report.json"
+    assert cli.parse_args(["--config", str(path), "--limit", "1"]).limit == 1

@@ -9,13 +9,13 @@
 ```bash
 cd /Users/yxb/OpenAI/agent-development
 uv sync
-PYTHONPATH=ARTI uv run python -m arti.cli --limit 20 --mode none --output ARTI/report.json
-PYTHONPATH=ARTI uv run python -m arti.cli --limit 20 --mode single --model qwen3.8-flash
-PYTHONPATH=ARTI uv run python -m arti.cli --limit 5 --mode debate --model qwen3.8-flash
+PYTHONPATH=ARTI uv run python -m arti.cli
 PYTHONPATH=ARTI uv run pytest -q ARTI/tests
 ```
 
-`--mode none` 只抓取与分析；`single` 每个合格市场调用一次模型，`debate` 调用四次。模型使用上层 `.env` 中的 `DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`；名称可通过 `--model` 或 `ARTI_MODEL` 指定。缺少配置或调用失败时，报告保留数据与分析，并填写 `assessment_error`。默认快照库为 `ARTI/arti.sqlite3`。重复运行后才可能获得 5 分钟、1 小时、24 小时变化；可以用 `--poll-count 2 --interval 300` 连续采样。`--platforms` 可限制平台，`--jump-pp` 调整跳变阈值。`--limit` 是每个平台**最终选出的市场数**：程序先抓取候选（Kalshi 至少 500 条，Polymarket 至少 100 条），排除无效价格、过旧数据和零成交且价差极宽的市场，再按平台分别评分、排序、选出前 `--limit` 条。候选快照也会保存，便于后续比较。
+日常设置在 [config.json](config.json)：`platforms`、`mode`、`model`、`limit`、`db`、`output`、`jump_pp`、`poll_count`、`interval`。直接编辑该 JSON 后运行上述命令即可。默认 `mode` 为 `none`，结果写入 `ARTI/report.json`，每次运行会覆盖该文件；历史行情另存于 SQLite。密钥只从上层 `.env` 读取，不写入 JSON。命令行参数仍可临时覆盖配置，例如 `PYTHONPATH=ARTI uv run python -m arti.cli --mode single --limit 1`；也可用 `--config /path/to/config.json` 指定另一份配置。报告 JSON 附带本次生效的 `settings`。
+
+`mode=none` 只抓取与分析；`single` 每个合格市场调用一次模型，`debate` 调用四次。模型使用上层 `.env` 中的 `DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`；名称可在配置中指定，命令行 `--model` 可临时覆盖。缺少配置或调用失败时，报告保留数据与分析，并填写 `assessment_error`。默认快照库为 `ARTI/arti.sqlite3`。重复运行后才可能获得 5 分钟、1 小时、24 小时变化；可以配置 `poll_count=2`、`interval=300` 连续采样。`jump_pp` 调整跳变阈值。`limit` 是每个平台**最终选出的市场数**：程序先抓取候选（Kalshi 至少 500 条，Polymarket 至少 100 条），排除无效价格、过旧数据和零成交且价差极宽的市场，再按平台分别评分、排序、选出前 `limit` 条。候选快照也会保存，便于后续比较。
 
 若只检出 ARTI 仓库，仍可不创建子项目环境，从 ARTI 目录用 `uv run --no-project --with 'pydantic>=2' --with 'openai>=3' --with python-dotenv python -m arti.cli --limit 20` 运行。此时 `.env` 仍放在 ARTI 的上层目录，模型模式另加 `--mode` 和 `--model`。测试可在同一命令中把 `python -m arti.cli ...` 换成 `--with pytest pytest -q tests`。
 

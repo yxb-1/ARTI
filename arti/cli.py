@@ -39,6 +39,16 @@ def _workspace_path(value: str) -> Path:
     return path if path.is_absolute() else ROOT / path
 
 
+def _provider_rejected_content(exc: Exception) -> bool:
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        code = body.get("code")
+        nested = body.get("error")
+        if code == "data_inspection_failed" or (isinstance(nested, dict) and nested.get("code") == "data_inspection_failed"):
+            return True
+    return "data_inspection_failed" in str(exc)
+
+
 def run(args):
     load_dotenv(ROOT / ".env")
     store = SnapshotStore(_workspace_path(args.db))
@@ -49,6 +59,7 @@ def run(args):
         client = OpenAI(api_key=os.environ["DASHSCOPE_API_KEY"], base_url=os.environ["DASHSCOPE_BASE_URL"], timeout=30, max_retries=0)
     reports = []
     all_fetch_errors = []
+    skipped_assessments = []
     for _ in range(args.poll_count):
         candidates, fetch_errors = [], []
         for platform in args.platforms:
@@ -66,37 +77,46 @@ def run(args):
         histories = {market.market_id: store.history(market.market_id, market.observed_at) for market in candidates}
         analyses = {market.market_id: analyze(market, histories[market.market_id], jump_pp=args.jump_pp) for market in candidates}
         store.save(candidates)
-        markets = []
         for platform in args.platforms:
             ranked = sorted(
                 (market for market in candidates if market.platform == platform and analyses[market.market_id].data_quality != "excluded"),
                 key=lambda market: -(analyses[market.market_id].attention_score or 0),
             )
-            markets.extend(ranked[:args.limit])
-            print(f"Selected {min(args.limit, len(ranked))} of {sum(m.platform == platform for m in candidates)} {platform} candidates", file=sys.stderr, flush=True)
-        for index, market in enumerate(markets, 1):
-            print(f"Analyzing {index}/{len(markets)}: {market.market_id}", file=sys.stderr, flush=True)
-            history = histories[market.market_id]
-            analysis = analyses[market.market_id]
-            report = Report(market=market, analysis=analysis)
-            if args.mode != "none":
-                if client is None:
-                    report.assessment_error = "model unavailable: configure ARTI_MODEL and DASHSCOPE_API_KEY/BASE_URL"
-                elif analysis.data_quality != "excluded":
+            selected = 0
+            attempts = 0
+            max_attempts = args.limit if args.mode == "none" else args.limit + 3
+            for market in ranked:
+                if selected >= args.limit or attempts >= max_attempts:
+                    break
+                attempts += 1
+                print(f"Analyzing {platform} candidate {attempts}: {market.market_id}", file=sys.stderr, flush=True)
+                history = histories[market.market_id]
+                analysis = analyses[market.market_id]
+                report = Report(market=market, analysis=analysis)
+                if args.mode != "none" and client is None:
+                    report.assessment_error = "model unavailable: configure model and DASHSCOPE_API_KEY/BASE_URL"
+                elif args.mode != "none":
                     try:
                         print(f"Assessing {market.market_id} ({args.mode})...", file=sys.stderr, flush=True)
                         report.assessment, report.debate_turns = assess(evidence_bundle(market, history, analysis), args.mode, client, model)
                     except Exception as exc:
-                        report.assessment_error = f"{type(exc).__name__}: {exc}"
-                else:
-                    report.assessment_error = "market excluded by data quality filter"
-            reports.append(report)
+                        error = f"{type(exc).__name__}: {exc}"
+                        if _provider_rejected_content(exc):
+                            report.assessment_error = error
+                            skipped_assessments.append(report.model_dump(mode="json"))
+                            print(f"Provider rejected {market.market_id}; trying next candidate", file=sys.stderr, flush=True)
+                            continue
+                        report.assessment_error = error
+                reports.append(report)
+                selected += 1
+            print(f"Selected {selected} of {sum(m.platform == platform for m in candidates)} {platform} candidates", file=sys.stderr, flush=True)
         if args.poll_count > 1 and _ < args.poll_count - 1:
             time.sleep(args.interval)
     reports.sort(key=lambda x: (x.market.platform, -(x.analysis.attention_score or 0)))
     settings = {key: str(getattr(args, key)) if isinstance(getattr(args, key), Path) else getattr(args, key)
                 for key in RunSettings.model_fields}
-    result = {"settings": settings, "reports": [r.model_dump(mode="json") for r in reports], "fetch_errors": all_fetch_errors}
+    result = {"settings": settings, "reports": [r.model_dump(mode="json") for r in reports],
+              "skipped_assessments": skipped_assessments, "fetch_errors": all_fetch_errors}
     output = json.dumps(result, ensure_ascii=False, indent=2)
     output_path = _workspace_path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)

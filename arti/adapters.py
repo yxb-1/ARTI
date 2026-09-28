@@ -125,7 +125,8 @@ def fetch_markets(platform: str, limit: int = 100) -> tuple[list[Market], list[s
     while len(records) < limit and pages < 5:
         try:
             if platform == "polymarket":
-                page = _get("https://gamma-api.polymarket.com/markets", {"active": "true", "closed": "false", "limit": min(100, limit - len(records)), "offset": offset})
+                page = _get("https://gamma-api.polymarket.com/markets", {"active": "true", "closed": "false",
+                    "order": "volume24hr", "ascending": "false", "limit": min(100, limit - len(records)), "offset": offset})
                 raw_items = page
                 offset += len(raw_items)
                 next_cursor = None

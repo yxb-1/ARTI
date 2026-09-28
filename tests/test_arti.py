@@ -7,7 +7,7 @@ import pytest
 from arti.adapters import kalshi_record, polymarket_record
 from arti.analysis import analyze, evidence_bundle
 from arti.decision import assess
-from arti.models import Market
+from arti.models import AgentAssessment, Market
 from arti.storage import SnapshotStore
 
 NOW = datetime(2026, 9, 28, 8, tzinfo=timezone.utc)
@@ -127,3 +127,42 @@ def test_json_config_and_cli_override(tmp_path):
     args = cli.parse_args(["--config", str(path)])
     assert args.mode == "single" and args.output == "ARTI/report.json"
     assert cli.parse_args(["--config", str(path), "--limit", "1"]).limit == 1
+
+
+def test_polymarket_fetch_sorts_by_recent_volume(monkeypatch):
+    from arti import adapters
+    queries = []
+    monkeypatch.setattr(adapters, "_get", lambda url, params: queries.append(params) or [])
+    adapters.fetch_markets("polymarket", 1)
+    assert queries[0]["order"] == "volume24hr"
+    assert queries[0]["ascending"] == "false"
+
+
+def test_provider_rejection_tries_next_candidate(tmp_path, monkeypatch):
+    from arti import cli
+    import openai
+    first = market().model_copy(update={"platform": "polymarket", "market_id": "polymarket:ONE", "source_id": "ONE"})
+    second = market().model_copy(update={"platform": "polymarket", "market_id": "polymarket:TWO", "source_id": "TWO"})
+    monkeypatch.setattr(cli, "fetch_markets", lambda platform, limit: ([first, second], []))
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: object())
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    monkeypatch.setenv("DASHSCOPE_BASE_URL", "https://example.com")
+
+    class Rejected(Exception):
+        body = {"error": {"code": "data_inspection_failed"}}
+
+    def fake_assess(bundle, mode, client, model):
+        if bundle.market.source_id == "ONE":
+            raise Rejected("provider refused")
+        return AgentAssessment(mode="single", as_of=bundle.as_of, status="watch", summary="Observe.",
+                               supporting_evidence=[], counter_evidence=[], open_questions=[],
+                               risks=[], cited_signals=[]), []
+
+    monkeypatch.setattr(cli, "assess", fake_assess)
+    args = SimpleNamespace(db=tmp_path / "db.sqlite3", mode="single", model="test", poll_count=1,
+                           platforms=["polymarket"], limit=1, jump_pp=8, output=tmp_path / "report.json", interval=1)
+    assert cli.run(args) == 0
+    result = json.loads(args.output.read_text())
+    assert result["reports"][0]["market"]["market_id"] == "polymarket:TWO"
+    assert result["skipped_assessments"][0]["market"]["market_id"] == "polymarket:ONE"
+    assert "provider refused" in result["skipped_assessments"][0]["assessment_error"]

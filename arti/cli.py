@@ -25,18 +25,22 @@ def run(args):
     model = args.model or os.getenv("ARTI_MODEL")
     if args.mode != "none" and model and os.getenv("DASHSCOPE_API_KEY") and os.getenv("DASHSCOPE_BASE_URL"):
         from openai import OpenAI
-        client = OpenAI(api_key=os.environ["DASHSCOPE_API_KEY"], base_url=os.environ["DASHSCOPE_BASE_URL"], timeout=30)
+        client = OpenAI(api_key=os.environ["DASHSCOPE_API_KEY"], base_url=os.environ["DASHSCOPE_BASE_URL"], timeout=30, max_retries=0)
     reports = []
     for _ in range(args.poll_count):
         markets, fetch_errors = [], []
         for platform in args.platforms:
+            print(f"Fetching {platform} markets (limit {args.limit})...", file=sys.stderr, flush=True)
             batch, errors = fetch_markets(platform, args.limit)
             markets.extend(batch)
             fetch_errors.extend(errors)
         for error in fetch_errors:
             print(error, file=sys.stderr)
-        for market in markets:
-            history = store.history(market.market_id, market.observed_at)
+        histories = {market.market_id: store.history(market.market_id, market.observed_at) for market in markets}
+        store.save(markets)
+        for index, market in enumerate(markets, 1):
+            print(f"Analyzing {index}/{len(markets)}: {market.market_id}", file=sys.stderr, flush=True)
+            history = histories[market.market_id]
             analysis = analyze(market, history, jump_pp=args.jump_pp)
             report = Report(market=market, analysis=analysis)
             if args.mode != "none":
@@ -44,13 +48,13 @@ def run(args):
                     report.assessment_error = "model unavailable: configure ARTI_MODEL and DASHSCOPE_API_KEY/BASE_URL"
                 elif analysis.data_quality != "excluded":
                     try:
+                        print(f"Assessing {market.market_id} ({args.mode})...", file=sys.stderr, flush=True)
                         report.assessment, report.debate_turns = assess(evidence_bundle(market, history, analysis), args.mode, client, model)
                     except Exception as exc:
                         report.assessment_error = f"{type(exc).__name__}: {exc}"
                 else:
                     report.assessment_error = "market excluded by data quality filter"
             reports.append(report)
-        store.save(markets)
         if args.poll_count > 1 and _ < args.poll_count - 1:
             time.sleep(args.interval)
     reports.sort(key=lambda x: (x.market.platform, -(x.analysis.attention_score or 0)))

@@ -21,6 +21,8 @@ PYTHONPATH=ARTI uv run pytest -q ARTI/tests
 
 公开 API 是只读的；抓取失败记录在 `fetch_errors` 与标准错误。首次运行通常显示 `insufficient_history`。部分信号依赖多次等间隔快照。报告仅供研究与人工复核。
 
+首次试跑建议 `--platforms kalshi --limit 1 --mode none`。启用模型后，每个市场的 `single` 有一次模型请求，`debate` 有四次串行请求；默认两个平台各抓取 20 个市场，因而可能耗时很久。命令会在标准错误显示抓取、分析和判断进度。模型请求 30 秒超时且不自动重试；失败记录在该市场的 `assessment_error`。快照在模型判断前保存，因此中断长时间判断也不会丢失本轮行情。
+
 ARTI 面向 Polymarket 和 Kalshi 的公开预测市场数据。它定期获取市场行情，保存可比较的历史快照，用确定性的程序筛选市场、追踪概率变化并检测异常，最后由可选择的 Agent 工作流汇总证据，形成可追溯的观察结论。
 
 项目借鉴 [TradingAgents](https://github.com/tauricresearch/tradingagents) 将数据分析与最终判断分工、以及让不同立场相互质疑的思路。第一版聚焦预测市场，提供单 Agent 和一轮双 Agent 辩论两种判断模式。

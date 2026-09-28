@@ -44,7 +44,7 @@ def analyze(market: Market, history: list[Market], *, jump_pp: float = 8, max_st
                 evidence={"change_pp": change.change_pp, "start_probability": change.start_probability,
                           "end_probability": change.end_probability, "actual_minutes": change.actual_minutes,
                           "threshold_pp": jump_pp}))
-    if market.yes_bid is None or market.yes_ask is None:
+    if market.yes_bid is None or market.yes_ask is None or (market.yes_bid == 0 and market.yes_ask == 0):
         issues.append("missing_quotes")
         signals.append(Signal(id="signal:quote_quality", type="quote_quality", severity="low",
                               evidence={"yes_bid": market.yes_bid, "yes_ask": market.yes_ask, "observed_at": now.isoformat()}))

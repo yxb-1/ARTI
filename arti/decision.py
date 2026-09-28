@@ -35,6 +35,7 @@ def _validate_ids(ids, bundle):
 
 
 def _call(client, model: str, developer: str, user: str, schema):
+    model_options = {"extra_body": {"enable_thinking": False}} if model.startswith("qwen3.8-") else {}
     response = client.chat.completions.create(
         model=model,
         # DashScope's OpenAI-compatible endpoint accepts system, not developer.
@@ -42,6 +43,7 @@ def _call(client, model: str, developer: str, user: str, schema):
         response_format={"type": "json_schema", "json_schema": {
             "name": schema.__name__, "strict": True, "schema": schema.model_json_schema()}},
         temperature=0,
+        **model_options,
     )
     choice = response.choices[0]
     if choice.finish_reason != "stop" or not choice.message.content:

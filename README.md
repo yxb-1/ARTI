@@ -19,9 +19,11 @@ PYTHONPATH=ARTI uv run pytest -q ARTI/tests
 
 若只检出 ARTI 仓库，仍可不创建子项目环境，从 ARTI 目录用 `uv run --no-project --with 'pydantic>=2' --with 'openai>=3' --with python-dotenv python -m arti.cli --limit 20` 运行。此时 `.env` 仍放在 ARTI 的上层目录，模型模式另加 `--mode` 和 `--model`。测试可在同一命令中把 `python -m arti.cli ...` 换成 `--with pytest pytest -q tests`。
 
-公开 API 是只读的；抓取失败记录在 `fetch_errors` 与标准错误。首次运行通常显示 `insufficient_history`。部分信号依赖多次等间隔快照。报告仅供研究与人工复核。
+公开 API 是只读的；Kalshi 抓取时排除组合市场，bid/ask 同为 0 且无有效最近价时视为缺少价格。抓取失败记录在 `fetch_errors` 与标准错误。首次运行通常显示 `insufficient_history`。部分信号依赖多次等间隔快照。报告仅供研究与人工复核。
 
 首次试跑建议 `--platforms kalshi --limit 1 --mode none`。两个平台的数据抓取并行进行。启用模型后，每个市场的 `single` 有一次模型请求，`debate` 有四次串行请求；默认两个平台各抓取 20 个市场，因而可能耗时很久。命令会在标准错误显示抓取、分析和判断进度。模型请求 30 秒超时且不自动重试；失败记录在该市场的 `assessment_error`。快照在模型判断前保存，因此中断长时间判断也不会丢失本轮行情。
+
+`qwen3.8-*` 结构化判断请求关闭思考模式，以缩短响应时间。提供方的内容审查拒绝会保留在 `assessment_error`，不会生成替代判断。
 
 ARTI 面向 Polymarket 和 Kalshi 的公开预测市场数据。它定期获取市场行情，保存可比较的历史快照，用确定性的程序筛选市场、追踪概率变化并检测异常，最后由可选择的 Agent 工作流汇总证据，形成可追溯的观察结论。
 

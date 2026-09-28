@@ -93,10 +93,11 @@ def kalshi_record(raw: dict, observed_at: datetime) -> Market | None:
     if not source_id or raw.get("market_type", "binary") != "binary":
         return None
     bid, ask, last = (_price(raw.get(k)) for k in ("yes_bid_dollars", "yes_ask_dollars", "last_price_dollars"))
-    if bid is not None and ask is not None and bid <= ask:
+    if bid is not None and ask is not None and bid <= ask and (bid > 0 or ask > 0):
         probability, source = (bid + ask) / 2, "bid_ask_midpoint"
     else:
-        probability, source = last, "last_price" if last is not None else None
+        probability = last if last is not None and last > 0 else None
+        source = "last_price" if probability is not None else None
         if bid is not None and ask is not None and bid > ask:
             bid = ask = None
     return Market(
@@ -126,7 +127,7 @@ def fetch_markets(platform: str, limit: int = 100) -> tuple[list[Market], list[s
                 offset += len(raw_items)
                 next_cursor = None
             elif platform == "kalshi":
-                params = {"status": "open", "limit": min(100, limit - len(records))}
+                params = {"status": "open", "mve_filter": "exclude", "limit": min(100, limit - len(records))}
                 if cursor:
                     params["cursor"] = cursor
                 page = _get("https://external-api.kalshi.com/trade-api/v2/markets", params)

@@ -36,6 +36,9 @@ def test_kalshi_midpoint_fallback_and_units():
     assert result.yes_probability == pytest.approx(0.55)
     assert result.volume_unit == "contracts"
     assert kalshi_record({**raw, "yes_ask_dollars": None}, NOW).price_source == "last_price"
+    empty = kalshi_record({**raw, "yes_bid_dollars": "0", "yes_ask_dollars": "0", "last_price_dollars": "0"}, NOW)
+    assert empty.yes_probability is None
+    assert analyze(empty, []).data_quality == "excluded"
 
 
 def test_snapshot_window_and_history_insufficient(tmp_path):

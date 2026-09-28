@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -31,9 +32,10 @@ def run(args):
         markets, fetch_errors = [], []
         for platform in args.platforms:
             print(f"Fetching {platform} markets (limit {args.limit})...", file=sys.stderr, flush=True)
-            batch, errors = fetch_markets(platform, args.limit)
-            markets.extend(batch)
-            fetch_errors.extend(errors)
+        with ThreadPoolExecutor(max_workers=len(args.platforms)) as pool:
+            for batch, errors in pool.map(lambda platform: fetch_markets(platform, args.limit), args.platforms):
+                markets.extend(batch)
+                fetch_errors.extend(errors)
         for error in fetch_errors:
             print(error, file=sys.stderr)
         histories = {market.market_id: store.history(market.market_id, market.observed_at) for market in markets}

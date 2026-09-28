@@ -1,0 +1,389 @@
+{
+  "settings": {
+    "platforms": [
+      "polymarket",
+      "kalshi"
+    ],
+    "mode": "debate",
+    "model": "qwen3.8-flash",
+    "limit": 1,
+    "db": "ARTI/arti.sqlite3",
+    "output": "ARTI/report.json",
+    "jump_pp": 8.0,
+    "poll_count": 1,
+    "interval": 300
+  },
+  "reports": [
+    {
+      "market": {
+        "market_id": "kalshi:KXTEMPMIAH-26SEP2803-T75.99",
+        "platform": "kalshi",
+        "source_id": "KXTEMPMIAH-26SEP2803-T75.99",
+        "title": "Will the temp in Miami be above 75.99° on Sep 28, 2026 at 3am EDT?",
+        "status": "active",
+        "close_time": "2026-09-28T07:00:00Z",
+        "source_updated_at": "2026-09-28T06:00:02.231654Z",
+        "yes_probability": 0.035,
+        "yes_bid": 0.03,
+        "yes_ask": 0.04,
+        "price_source": "bid_ask_midpoint",
+        "volume_total": 6863.71,
+        "volume_24h": 4726.55,
+        "volume_unit": "contracts",
+        "liquidity": 51.0,
+        "liquidity_unit": "contracts_at_best_quotes",
+        "observed_at": "2026-09-28T06:46:49.778022Z",
+        "source_url": "https://kalshi.com/markets/KXTEMPMIAH-26SEP2803-T75.99"
+      },
+      "analysis": {
+        "attention_score": 81.1,
+        "changes": {},
+        "signals": [],
+        "data_quality": "adequate",
+        "quality_issues": []
+      },
+      "assessment": {
+        "mode": "debate",
+        "as_of": "2026-09-28T06:46:49.778022Z",
+        "status": "insufficient_evidence",
+        "summary": "双方就市场剧烈价格重估（Yes概率从0.25降至0.035）的性质存在分歧。正方认为成交量显著放大支持了实质性头寸转移，且窄价差表明定价机制有效；反方指出临近结算（剩余约14分钟）导致的收敛是统计常态，并质疑数据时间戳不一致性（流动性波动而成交量静止）以及极低绝对流动性下的定价脆弱性。鉴于缺乏外部气象数据验证物理现实，且历史样本极少无法区分正常收敛与异常冲击，现有证据不足以形成关于市场异动原因的可靠判断。",
+        "supporting_evidence": [
+          "metric:volume_total",
+          "metric:volume_24h"
+        ],
+        "counter_evidence": [
+          "quality:data_quality",
+          "quality:history_sample_count",
+          "metric:liquidity"
+        ],
+        "open_questions": [
+          "在06:27至06:28期间，为何流动性大幅变化而成交量保持不变？是否存在数据抓取错误？",
+          "是否有外部气象API数据证实Miami在06:46时的实际温度已确定低于75.99°F？"
+        ],
+        "risks": [
+          "低流动性可能导致价格对少量订单过度敏感，产生虚假信号",
+          "临近结算时段的收敛行为可能被误读为重大信息冲击",
+          "数据源可能存在更新滞后或时间戳不一致问题"
+        ],
+        "cited_signals": []
+      },
+      "assessment_error": null,
+      "debate_turns": [
+        {
+          "role": "R",
+          "phase": "opening",
+          "model": "qwen3.8-flash",
+          "created_at": "2026-09-28T06:47:52.366207Z",
+          "content": {
+            "phase": "opening",
+            "position": "affirmative",
+            "claims": [
+              {
+                "text": "市场在极短时间内（约32分钟）经历了剧烈的价格重估，Yes概率从0.25骤降至0.035，跌幅超过86%，这种大幅度的单边移动表明有重大新信息或大额订单进入市场。",
+                "evidence_ids": [
+                  "metric:yes_probability"
+                ]
+              },
+              {
+                "text": "伴随价格下跌的是成交量的显著放大，总成交量从1785.43增至6863.71合约，24小时成交量从1297.06增至4726.55，显示该价格变动得到了实际交易活动的支持，而非仅仅是报价调整。",
+                "evidence_ids": [
+                  "metric:volume_total",
+                  "metric:volume_24h"
+                ]
+              },
+              {
+                "text": "尽管流动性绝对值较低（51合约），但买卖价差保持在1%（0.01）的窄幅区间，且Bid/Ask分别为0.03/0.04，说明在当前低概率状态下市场仍具备有效的定价机制和一定的深度，异动并非由流动性枯竭导致的假性滑点引起。",
+                "evidence_ids": [
+                  "metric:liquidity",
+                  "metric:yes_spread",
+                  "metric:yes_bid",
+                  "metric:yes_ask"
+                ]
+              }
+            ],
+            "limitations": [
+              "历史快照样本仅包含3个数据点，时间跨度短，无法排除这是临近结算时（Close time为当日07:00Z，当前06:46Z）正常的收敛行为而非异常事件。",
+              "缺乏具体的新闻或气象数据证据来解释为何温度预测概率会如此剧烈地下降。"
+            ],
+            "questions": []
+          }
+        },
+        {
+          "role": "C",
+          "phase": "challenge",
+          "model": "qwen3.8-flash",
+          "created_at": "2026-09-28T06:48:04.316444Z",
+          "content": {
+            "phase": "challenge",
+            "position": "negative",
+            "claims": [
+              {
+                "text": "研究方声称价格下跌得到成交量支持，但数据存在严重的时间戳不一致性。在06:27:29和06:28:53两个快照中，尽管概率从0.04变为0.045且流动性从138骤降至9，总成交量（volume_total）却完全静止在2944.5。这表明该时间段内的价格波动并未伴随实际交易发生，或者数据源更新滞后，削弱了“大额订单驱动价格”的论点。",
+                "evidence_ids": [
+                  "metric:volume_total",
+                  "quality:data_quality"
+                ]
+              },
+              {
+                "text": "当前市场处于临近结算阶段（Close time为07:00Z，当前06:46Z），剩余时间仅约14分钟。在此极端短视距下，Yes概率从0.25收敛至0.035更可能是由于气象观测数据的实时确认导致不确定性消除，而非异常的市场操纵或重大新信息冲击。这种收敛行为在低概率尾部事件中是统计上的常态，不应被过度解读为剧烈重估。",
+                "evidence_ids": [
+                  "metric:yes_probability",
+                  "quality:available_change_windows"
+                ]
+              },
+              {
+                "text": "虽然买卖价差维持在0.01，但绝对流动性极低（51合约）。在如此薄的深度下，少量资金即可造成显著的价格位移。历史数据显示流动性曾在短时间内从138跌至9，证明做市商或参与者可能在快速撤单。因此，当前的窄价差可能只是瞬时状态，不足以证明市场具备稳健的深度来支撑这一价格发现过程，反而暗示了高滑点风险下的定价脆弱性。",
+                "evidence_ids": [
+                  "metric:liquidity",
+                  "metric:yes_spread"
+                ]
+              }
+            ],
+            "limitations": [
+              "缺乏具体的Miami当地气象站实时温度读数证据，无法验证0.035的概率是否准确反映了物理现实。",
+              "历史样本仅3个点且间隔极短，无法构建可靠的时间序列模型来区分正常收敛与异常波动。"
+            ],
+            "questions": [
+              "在06:27至06:28期间，为何流动性大幅变化而成交量保持不变？是否存在数据抓取错误？",
+              "是否有外部气象API数据证实Miami在06:46时的实际温度已确定低于75.99°F？"
+            ]
+          }
+        },
+        {
+          "role": "R",
+          "phase": "reply",
+          "model": "qwen3.8-flash",
+          "created_at": "2026-09-28T06:48:19.927207Z",
+          "content": {
+            "phase": "reply",
+            "position": "affirmative",
+            "claims": [
+              {
+                "text": "承认反方指出的数据时间戳不一致性（06:27至06:28期间成交量静止而流动性剧烈波动），这确实削弱了“每一秒的价格变动都伴随等额成交”的线性因果假设。然而，从初始快照（06:14）到最终快照（06:46），总成交量增加了约5078合约（从1785增至6863），这一巨大的增量发生在价格从0.25跌至0.035的过程中。即便中间存在数据滞后或抓取间隙，整体交易活动的显著放大依然支持市场发生了实质性的头寸转移，而非纯粹的报价漂移。",
+                "evidence_ids": [
+                  "metric:volume_total",
+                  "quality:data_quality"
+                ]
+              },
+              {
+                "text": "关于临近结算导致的正常收敛论点：虽然剩余时间仅14分钟，但概率从0.25降至0.035意味着市场认为“温度高于75.99°F”的可能性几乎归零。在气象市场中，如果实际温度接近阈值（例如75.5°F vs 76.0°F），不确定性通常不会如此迅速且彻底地消除，除非有确凿的实时观测数据排除了升温可能。这种极端的尾部风险定价变化，结合高换手率，表明市场参与者正在基于新信息快速平仓或建立对冲头寸，其反应速度和幅度超出了常规的时间衰减效应。",
+                "evidence_ids": [
+                  "metric:yes_probability",
+                  "metric:volume_24h"
+                ]
+              },
+              {
+                "text": "针对流动性脆弱性的质疑：尽管绝对流动性低（51合约），但买卖价差始终维持在0.01-0.02的窄幅区间（Bid 0.03/Ask 0.04）。在极端低概率状态下，做市商通常会扩大价差以规避风险。维持窄价差表明做市商对当前定价方向有较高信心，或者竞争者众多导致无法轻易拉大价差。因此，当前的价格发现过程并非由流动性枯竭引起的假性滑点主导，而是反映了市场共识的快速形成。",
+                "evidence_ids": [
+                  "metric:liquidity",
+                  "metric:yes_spread",
+                  "metric:yes_bid",
+                  "metric:yes_ask"
+                ]
+              }
+            ],
+            "limitations": [
+              "历史样本中06:27至06:28的数据异常（量平流变）提示数据源可能存在更新延迟或快照非同步问题，需进一步核查原始订单簿日志以确认该时间段内是否有未记录的成交。",
+              "缺乏Miami当地气象站的实时温度读数，无法独立验证0.035的概率是否准确对应物理现实，只能依赖市场定价行为作为代理指标。"
+            ],
+            "questions": []
+          }
+        }
+      ]
+    },
+    {
+      "market": {
+        "market_id": "polymarket:4641064",
+        "platform": "polymarket",
+        "source_id": "4641064",
+        "title": "US x Iran ceasefire continues through September 30?",
+        "status": "open",
+        "close_time": "2026-09-30T23:59:00Z",
+        "source_updated_at": "2026-09-28T06:44:46.354386Z",
+        "yes_probability": 0.955,
+        "yes_bid": null,
+        "yes_ask": null,
+        "price_source": "outcome_price",
+        "volume_total": 1925502.2111349998,
+        "volume_24h": 403595.980434,
+        "volume_unit": "USD",
+        "liquidity": 164357.7245,
+        "liquidity_unit": "USD",
+        "observed_at": "2026-09-28T06:46:49.777644Z",
+        "source_url": "https://polymarket.com/event/us-x-iran-ceasefire-continues-through-september-30-20260917"
+      },
+      "analysis": {
+        "attention_score": 70.0,
+        "changes": {},
+        "signals": [
+          {
+            "id": "signal:quote_quality",
+            "type": "quote_quality",
+            "severity": "low",
+            "evidence": {
+              "yes_bid": null,
+              "yes_ask": null,
+              "observed_at": "2026-09-28T06:46:49.777644+00:00"
+            }
+          }
+        ],
+        "data_quality": "limited",
+        "quality_issues": [
+          "missing_quotes"
+        ]
+      },
+      "assessment": {
+        "mode": "debate",
+        "as_of": "2026-09-28T06:46:49.777644Z",
+        "status": "insufficient_evidence",
+        "summary": "双方最终达成共识：当前市场数据不足以支持任何关于“异动”或明确交易趋势的结论。虽然Yes概率稳定在0.955，但关键的数据质量缺陷（缺失买卖报价、历史样本极少且无有效变化窗口）严重阻碍了对价格发现效率和流动性深度的评估。质疑方指出的24小时成交量短期微降被研究方接受为对“持续活跃”论点的修正，但双方均同意这一观察缺乏统计显著性，无法区分是趋势衰退还是计算波动。因此，该市场状态应被视为“数据不足下的静态高概率”，而非具有可预测性的动态信号。",
+        "supporting_evidence": [
+          "metric:yes_probability",
+          "quality:data_quality",
+          "signal:quote_quality",
+          "quality:issue:missing_quotes",
+          "quality:history_sample_count",
+          "quality:available_change_windows"
+        ],
+        "counter_evidence": [],
+        "open_questions": [
+          "能否提供包含完整订单簿信息（bid/ask）的更长时间段历史数据以评估点差和深度？",
+          "是否有针对该市场特定时间段内的大额单笔交易记录以解释24小时成交量的构成及潜在异常？"
+        ],
+        "risks": [
+          "由于缺失实时买卖盘口数据（bid/ask），无法计算有效价差或深度，导致无法判断即时交易成本和市场有效性。",
+          "历史数据点过少（n=2），无法构建可靠的时间序列趋势或检测突变，使得任何基于短期波动的推断都不可靠。",
+          "没有外部新闻或事件证据包，无法将市场行为与具体地缘政治事件直接关联，限制了因果分析能力。"
+        ],
+        "cited_signals": [
+          "signal:quote_quality"
+        ]
+      },
+      "assessment_error": null,
+      "debate_turns": [
+        {
+          "role": "R",
+          "phase": "opening",
+          "model": "qwen3.8-flash",
+          "created_at": "2026-09-28T06:47:11.689860Z",
+          "content": {
+            "phase": "opening",
+            "position": "neutral",
+            "claims": [
+              {
+                "text": "市场当前处于高确定性状态，Yes概率稳定在0.955，且24小时成交量（约40.36万美元）相对于总成交量（约192.55万美元）和流动性池（约16.44万美元）保持活跃，表明近期有持续的交易兴趣而非静止。",
+                "evidence_ids": [
+                  "metric:yes_probability",
+                  "metric:volume_24h",
+                  "metric:volume_total",
+                  "metric:liquidity"
+                ]
+              },
+              {
+                "text": "然而，数据质量被标记为“limited”，主要因为缺失买卖报价（bid/ask均为null），这导致无法评估当前的点差宽度和即时交易成本，削弱了对价格发现效率的判断。",
+                "evidence_ids": [
+                  "quality:data_quality",
+                  "signal:quote_quality",
+                  "quality:issue:missing_quotes"
+                ]
+              },
+              {
+                "text": "此外，历史快照样本极少（仅2个）且无有效的变化窗口分析，使得无法通过时间序列数据确认是否存在异常的价格或流动性波动，因此所谓的“异动”缺乏统计显著性的支持。",
+                "evidence_ids": [
+                  "quality:history_sample_count",
+                  "quality:available_change_windows"
+                ]
+              }
+            ],
+            "limitations": [
+              "缺失实时买卖盘口数据（bid/ask），无法计算有效价差或深度。",
+              "历史数据点过少（n=2），无法构建可靠的时间序列趋势或检测突变。",
+              "没有外部新闻或事件证据包，无法将市场行为与具体地缘政治事件直接关联。"
+            ],
+            "questions": [
+              "能否提供包含完整订单簿信息（bid/ask）的更长时间段历史数据？",
+              "是否有针对该市场特定时间段内的大额单笔交易记录以解释24小时成交量的构成？"
+            ]
+          }
+        },
+        {
+          "role": "C",
+          "phase": "challenge",
+          "model": "qwen3.8-flash",
+          "created_at": "2026-09-28T06:47:20.248917Z",
+          "content": {
+            "phase": "challenge",
+            "position": "skeptical",
+            "claims": [
+              {
+                "text": "研究Agent声称24小时成交量相对于总成交量和流动性池保持活跃，但数据快照显示在约2分钟内（06:27至06:46），24小时成交量从405,950.80美元下降至403,595.98美元。这种短期内的数值减少表明近期交易活动可能正在减弱或处于停滞状态，而非其描述的“持续的交易兴趣”，且缺乏更长时间序列数据来验证这一趋势的稳定性。",
+                "evidence_ids": [
+                  "metric:volume_24h"
+                ]
+              },
+              {
+                "text": "由于缺失买卖报价（bid/ask均为null），无法评估当前的点差宽度和即时交易成本，这导致无法判断市场是否处于有效价格发现状态。此外，历史样本极少（仅2个）且无有效的变化窗口分析，使得无法通过时间序列数据确认是否存在异常的价格或流动性波动，因此所谓的“异动”缺乏统计显著性的支持。",
+                "evidence_ids": [
+                  "quality:data_quality",
+                  "signal:quote_quality",
+                  "quality:issue:missing_quotes",
+                  "quality:history_sample_count",
+                  "quality:available_change_windows"
+                ]
+              }
+            ],
+            "limitations": [
+              "缺失实时买卖盘口数据（bid/ask），无法计算有效价差或深度。",
+              "历史数据点过少（n=2），无法构建可靠的时间序列趋势或检测突变。",
+              "没有外部新闻或事件证据包，无法将市场行为与具体地缘政治事件直接关联。"
+            ],
+            "questions": [
+              "能否提供包含完整订单簿信息（bid/ask）的更长时间段历史数据？",
+              "是否有针对该市场特定时间段内的大额单笔交易记录以解释24小时成交量的构成？"
+            ]
+          }
+        },
+        {
+          "role": "R",
+          "phase": "reply",
+          "model": "qwen3.8-flash",
+          "created_at": "2026-09-28T06:47:31.126819Z",
+          "content": {
+            "phase": "reply",
+            "position": "neutral",
+            "claims": [
+              {
+                "text": "针对质疑方指出的24小时成交量在极短时间内（约2分钟）从405,950.80美元下降至403,595.98美元的现象，我修正此前关于“持续交易兴趣”的表述。这种短期内的数值减少确实表明近期即时交易活动可能减弱或停滞，而非活跃。然而，这一观察仅基于两个时间点的快照，且缺乏更长时间序列数据支持，因此无法断定这是趋势性衰退还是正常的滚动窗口计算波动。",
+                "evidence_ids": [
+                  "metric:volume_24h",
+                  "quality:history_sample_count"
+                ]
+              },
+              {
+                "text": "同意质疑方关于数据质量限制的观点。由于缺失买卖报价（bid/ask均为null），我们无法评估当前的点差宽度和即时交易成本，这严重削弱了对价格发现效率的判断。同时，历史样本极少（仅2个）且无有效的变化窗口分析，使得任何关于“异动”的统计显著性主张都缺乏基础。因此，目前的市场状态应被视为“数据不足下的静态高概率”，而非具有明确方向性的动态异动。",
+                "evidence_ids": [
+                  "quality:data_quality",
+                  "signal:quote_quality",
+                  "quality:issue:missing_quotes",
+                  "quality:history_sample_count",
+                  "quality:available_change_windows"
+                ]
+              }
+            ],
+            "limitations": [
+              "缺失实时买卖盘口数据（bid/ask），无法计算有效价差或深度。",
+              "历史数据点过少（n=2），无法构建可靠的时间序列趋势或检测突变。",
+              "没有外部新闻或事件证据包，无法将市场行为与具体地缘政治事件直接关联。"
+            ],
+            "questions": [
+              "能否提供包含完整订单簿信息（bid/ask）的更长时间段历史数据？",
+              "是否有针对该市场特定时间段内的大额单笔交易记录以解释24小时成交量的构成？"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "skipped_assessments": [],
+  "fetch_errors": []
+}

@@ -31,14 +31,24 @@ def test_polymarket_yes_mapping_and_rejection():
 
 def test_kalshi_midpoint_fallback_and_units():
     raw = {"ticker": "T", "title": "Q", "status": "open", "yes_bid_dollars": "0.50",
-           "yes_ask_dollars": "0.60", "last_price_dollars": "0.40", "volume_fp": "12.00"}
+           "yes_ask_dollars": "0.60", "last_price_dollars": "0.40", "volume_fp": "12.00",
+           "yes_bid_size_fp": "20", "yes_ask_size_fp": "8", "open_interest_fp": "1000"}
     result = kalshi_record(raw, NOW)
     assert result.yes_probability == pytest.approx(0.55)
     assert result.volume_unit == "contracts"
+    assert result.liquidity == 8
+    assert result.liquidity_unit == "contracts_at_best_quotes"
     assert kalshi_record({**raw, "yes_ask_dollars": None}, NOW).price_source == "last_price"
     empty = kalshi_record({**raw, "yes_bid_dollars": "0", "yes_ask_dollars": "0", "last_price_dollars": "0"}, NOW)
     assert empty.yes_probability is None
     assert analyze(empty, []).data_quality == "excluded"
+
+
+def test_extreme_spread_without_trades_is_excluded():
+    thin = market().model_copy(update={"yes_bid": 0.03, "yes_ask": 0.95, "volume_24h": 0})
+    result = analyze(thin, [])
+    assert result.data_quality == "excluded"
+    assert "unusable_wide_spread" in result.quality_issues
 
 
 def test_snapshot_window_and_history_insufficient(tmp_path):
@@ -91,3 +101,16 @@ def test_single_and_debate_contracts():
     assert verdict.mode == "debate" and [t.phase for t in turns] == phases
     with pytest.raises(ValueError, match="unknown evidence"):
         assess(bundle, "single", FakeClient([{**base, "mode": "single", "supporting_evidence": ["invented"]}]), "test")
+
+
+def test_cli_selects_ranked_candidate(tmp_path, monkeypatch):
+    from arti import cli
+    weak = market().model_copy(update={"market_id": "kalshi:WEAK", "source_id": "WEAK", "yes_bid": 0.03,
+                                       "yes_ask": 0.95, "volume_total": 0, "volume_24h": 0, "liquidity": 0})
+    strong = market().model_copy(update={"market_id": "kalshi:STRONG", "source_id": "STRONG"})
+    monkeypatch.setattr(cli, "fetch_markets", lambda platform, limit: ([weak, strong], []))
+    args = SimpleNamespace(db=tmp_path / "db.sqlite3", mode="none", model=None, poll_count=1,
+                           platforms=["kalshi"], limit=1, jump_pp=8, output=tmp_path / "report.json", interval=1)
+    assert cli.run(args) == 0
+    report = json.loads(args.output.read_text())
+    assert [r["market"]["market_id"] for r in report["reports"]] == ["kalshi:STRONG"]

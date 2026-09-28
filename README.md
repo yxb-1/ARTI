@@ -15,11 +15,11 @@ PYTHONPATH=ARTI uv run python -m arti.cli --limit 5 --mode debate --model qwen3.
 PYTHONPATH=ARTI uv run pytest -q ARTI/tests
 ```
 
-`--mode none` 只抓取与分析；`single` 每个合格市场调用一次模型，`debate` 调用四次。模型使用上层 `.env` 中的 `DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`；名称可通过 `--model` 或 `ARTI_MODEL` 指定。缺少配置或调用失败时，报告保留数据与分析，并填写 `assessment_error`。默认快照库为 `ARTI/arti.sqlite3`。重复运行后才可能获得 5 分钟、1 小时、24 小时变化；可以用 `--poll-count 2 --interval 300` 连续采样。`--platforms` 可限制平台，`--jump-pp` 调整跳变阈值。报告按平台分别排序。
+`--mode none` 只抓取与分析；`single` 每个合格市场调用一次模型，`debate` 调用四次。模型使用上层 `.env` 中的 `DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`；名称可通过 `--model` 或 `ARTI_MODEL` 指定。缺少配置或调用失败时，报告保留数据与分析，并填写 `assessment_error`。默认快照库为 `ARTI/arti.sqlite3`。重复运行后才可能获得 5 分钟、1 小时、24 小时变化；可以用 `--poll-count 2 --interval 300` 连续采样。`--platforms` 可限制平台，`--jump-pp` 调整跳变阈值。`--limit` 是每个平台**最终选出的市场数**：程序先抓取候选（Kalshi 至少 500 条，Polymarket 至少 100 条），排除无效价格、过旧数据和零成交且价差极宽的市场，再按平台分别评分、排序、选出前 `--limit` 条。候选快照也会保存，便于后续比较。
 
 若只检出 ARTI 仓库，仍可不创建子项目环境，从 ARTI 目录用 `uv run --no-project --with 'pydantic>=2' --with 'openai>=3' --with python-dotenv python -m arti.cli --limit 20` 运行。此时 `.env` 仍放在 ARTI 的上层目录，模型模式另加 `--mode` 和 `--model`。测试可在同一命令中把 `python -m arti.cli ...` 换成 `--with pytest pytest -q tests`。
 
-公开 API 是只读的；Kalshi 抓取时排除组合市场，bid/ask 同为 0 且无有效最近价时视为缺少价格。抓取失败记录在 `fetch_errors` 与标准错误。首次运行通常显示 `insufficient_history`。部分信号依赖多次等间隔快照。报告仅供研究与人工复核。
+公开 API 是只读的；Kalshi 抓取时排除组合市场，bid/ask 同为 0 且无有效最近价时视为缺少价格。Kalshi 的 `liquidity` 记录最优 YES 买卖报价两侧较小的挂单量（合约数），不把未平仓合约数当作报价深度。抓取失败记录在 `fetch_errors` 与标准错误。首次运行通常显示 `insufficient_history`。部分信号依赖多次等间隔快照。报告仅供研究与人工复核。
 
 首次试跑建议 `--platforms kalshi --limit 1 --mode none`。两个平台的数据抓取并行进行。启用模型后，每个市场的 `single` 有一次模型请求，`debate` 有四次串行请求；默认两个平台各抓取 20 个市场，因而可能耗时很久。命令会在标准错误显示抓取、分析和判断进度。模型请求 30 秒超时且不自动重试；失败记录在该市场的 `assessment_error`。快照在模型判断前保存，因此中断长时间判断也不会丢失本轮行情。
 

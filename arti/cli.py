@@ -29,21 +29,33 @@ def run(args):
         client = OpenAI(api_key=os.environ["DASHSCOPE_API_KEY"], base_url=os.environ["DASHSCOPE_BASE_URL"], timeout=30, max_retries=0)
     reports = []
     for _ in range(args.poll_count):
-        markets, fetch_errors = [], []
+        candidates, fetch_errors = [], []
         for platform in args.platforms:
-            print(f"Fetching {platform} markets (limit {args.limit})...", file=sys.stderr, flush=True)
+            pool_size = max(args.limit, 500 if platform == "kalshi" else 100)
+            print(f"Fetching {platform} candidates (up to {pool_size})...", file=sys.stderr, flush=True)
         with ThreadPoolExecutor(max_workers=len(args.platforms)) as pool:
-            for batch, errors in pool.map(lambda platform: fetch_markets(platform, args.limit), args.platforms):
-                markets.extend(batch)
+            for batch, errors in pool.map(
+                lambda platform: fetch_markets(platform, max(args.limit, 500 if platform == "kalshi" else 100)), args.platforms
+            ):
+                candidates.extend(batch)
                 fetch_errors.extend(errors)
         for error in fetch_errors:
             print(error, file=sys.stderr)
-        histories = {market.market_id: store.history(market.market_id, market.observed_at) for market in markets}
-        store.save(markets)
+        histories = {market.market_id: store.history(market.market_id, market.observed_at) for market in candidates}
+        analyses = {market.market_id: analyze(market, histories[market.market_id], jump_pp=args.jump_pp) for market in candidates}
+        store.save(candidates)
+        markets = []
+        for platform in args.platforms:
+            ranked = sorted(
+                (market for market in candidates if market.platform == platform and analyses[market.market_id].data_quality != "excluded"),
+                key=lambda market: -(analyses[market.market_id].attention_score or 0),
+            )
+            markets.extend(ranked[:args.limit])
+            print(f"Selected {min(args.limit, len(ranked))} of {sum(m.platform == platform for m in candidates)} {platform} candidates", file=sys.stderr, flush=True)
         for index, market in enumerate(markets, 1):
             print(f"Analyzing {index}/{len(markets)}: {market.market_id}", file=sys.stderr, flush=True)
             history = histories[market.market_id]
-            analysis = analyze(market, history, jump_pp=args.jump_pp)
+            analysis = analyses[market.market_id]
             report = Report(market=market, analysis=analysis)
             if args.mode != "none":
                 if client is None:

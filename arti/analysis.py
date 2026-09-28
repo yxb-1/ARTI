@@ -20,7 +20,10 @@ def analyze(market: Market, history: list[Market], *, jump_pp: float = 8, max_st
         issues.append("stale_source_update")
     if market.close_time and market.close_time <= now:
         issues.append("past_close_time")
-    excluded = any(x in issues for x in ("market_not_open", "missing_yes_price", "stale_source_update", "past_close_time"))
+    spread = market.yes_ask - market.yes_bid if market.yes_bid is not None and market.yes_ask is not None else None
+    if spread is not None and spread >= 0.5 and (market.volume_24h or 0) == 0:
+        issues.append("unusable_wide_spread")
+    excluded = any(x in issues for x in ("market_not_open", "missing_yes_price", "stale_source_update", "past_close_time", "unusable_wide_spread"))
     changes = {}
     valid = [h for h in history if h.yes_probability is not None and h.observed_at < now]
     for minutes in WINDOWS:
@@ -97,7 +100,7 @@ def analyze(market: Market, history: list[Market], *, jump_pp: float = 8, max_st
     if not excluded:
         score = min(100, round(
             20 + min(25, 5 * log1p(market.volume_24h or 0))
-            + (15 if market.yes_bid is not None and market.yes_ask is not None else 0)
+            + (15 * max(0, 1 - spread / 0.2) if spread is not None else 0)
             + min(15, 3 * log1p(market.liquidity or 0))
             + (10 if market.close_time and timedelta(0) < market.close_time-now <= timedelta(days=7) else 0)
             + min(15, max((abs(c.change_pp) for c in changes.values()), default=0)), 1))

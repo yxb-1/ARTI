@@ -18,7 +18,9 @@ class DebateFailure(Exception):
         self.turns = list(turns)
 
 def _prompt_after(heading: str) -> str:
-    design = (Path(__file__).resolve().parents[1] / "PROMPTS.md").read_text(encoding="utf-8")
+    package_copy = Path(__file__).resolve().with_name("PROMPTS.md")
+    prompt_path = package_copy if package_copy.exists() else Path(__file__).resolve().parents[1] / "PROMPTS.md"
+    design = prompt_path.read_text(encoding="utf-8")
     section = design.split(heading, 1)[1]
     match = re.search(r"```xml\s*(<agent_instructions>.*?</agent_instructions>)\s*```", section, re.DOTALL)
     if not match:

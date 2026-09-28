@@ -1,8 +1,8 @@
-# Agent 判断层提示词设计
+# Agent 判断层提示词与输出契约
 
-> 当前状态：已接入 `arti/decision.py`。运行时直接读取本文三个固定角色提示词。百炼兼容接口使用 `system`、`user` 两条独立消息；XML 标签用于标识消息内部的内容边界，输出仍为 JSON。
+`arti/decision.py` 直接读取本文三个固定角色提示词。百炼兼容接口使用 `system`、`user` 两条独立消息；XML 标签用于标识消息内部的内容边界，输出仍为 JSON。
 
-本设计参考 [OpenAI 提示词工程文档](https://developers.openai.com/api/docs/guides/prompt-engineering)中角色、指令与上下文分离的方式，以及[结构化输出文档](https://developers.openai.com/api/docs/guides/structured-outputs)中的 schema 约束。TradingAgents 的多角色研究思路用于双 Agent 模式；本项目的判断对象是预测市场异动，不是股票交易决策。
+角色、指令与上下文分离的方式参考 [OpenAI 提示词工程文档](https://developers.openai.com/api/docs/guides/prompt-engineering)，schema 约束参考[结构化输出文档](https://developers.openai.com/api/docs/guides/structured-outputs)。TradingAgents 的多角色研究思路用于双 Agent 模式；本项目的判断对象是预测市场异动，不是股票交易决策。
 
 ## 共同输入与输出约定
 
@@ -184,7 +184,7 @@ verdict 阶段只返回符合 AgentAssessment schema 的 JSON，mode 必须为 d
 </debate_case>
 ```
 
-## 实现时的检查点
+## 运行校验
 
 1. 固定 developer 提示词分别版本化；动态市场数据只进入 user 消息。修改角色或输出模型时同步更新评估样本。
 2. 四轮调用使用同一份 EvidenceBundle，不在辩论中途刷新市场数据；每条发言记录角色、阶段、模型版本和时间。

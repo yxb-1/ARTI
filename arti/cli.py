@@ -18,8 +18,16 @@ from .decision import DebateFailure, assess
 from .models import Report, StrictModel
 from .storage import SnapshotStore
 
-ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CONFIG = ROOT / "ARTI" / "config.json"
+PACKAGE_DIR = Path(__file__).resolve().parent
+SOURCE_ROOT = PACKAGE_DIR.parent
+ROOT = SOURCE_ROOT if (SOURCE_ROOT / "pyproject.toml").exists() else Path.cwd()
+
+
+def _default_config() -> Path:
+    for path in (ROOT / "config.json", ROOT / "config.example.json", PACKAGE_DIR / "config.example.json"):
+        if path.exists():
+            return path
+    return ROOT / "config.example.json"
 
 
 class RunSettings(StrictModel):
@@ -36,6 +44,9 @@ class RunSettings(StrictModel):
 
 def _workspace_path(value: str) -> Path:
     path = Path(value).expanduser()
+    # Older local configurations used paths relative to the parent workspace.
+    if not path.is_absolute() and ROOT.name == "ARTI" and path.parts and path.parts[0] == "ARTI":
+        path = Path(*path.parts[1:])
     return path if path.is_absolute() else ROOT / path
 
 
@@ -50,7 +61,8 @@ def _provider_rejected_content(exc: Exception) -> bool:
 
 
 def run(args):
-    load_dotenv(ROOT / ".env")
+    local_env = ROOT / ".env"
+    load_dotenv(local_env if local_env.exists() else ROOT.parent / ".env")
     store = SnapshotStore(_workspace_path(args.db))
     client = None
     model = args.model or os.getenv("ARTI_MODEL")
@@ -132,8 +144,9 @@ def run(args):
 
 
 def parse_args(argv=None):
+    default_config = str(_default_config())
     config_parser = argparse.ArgumentParser(add_help=False)
-    config_parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    config_parser.add_argument("--config", default=default_config)
     config_args, _ = config_parser.parse_known_args(argv)
     config_path = Path(config_args.config).expanduser()
     try:
@@ -141,7 +154,7 @@ def parse_args(argv=None):
     except (OSError, ValidationError) as exc:
         config_parser.error(f"cannot load config {config_path}: {exc}")
     parser = argparse.ArgumentParser(description="ARTI public prediction market monitor")
-    parser.add_argument("--config", default=str(DEFAULT_CONFIG), help="JSON settings file")
+    parser.add_argument("--config", default=default_config, help="JSON settings file")
     parser.add_argument("--platforms", nargs="+", choices=["polymarket", "kalshi"], default=settings.platforms)
     parser.add_argument("--mode", choices=["none", "single", "debate"], default=settings.mode)
     parser.add_argument("--model", default=settings.model, help="model name")

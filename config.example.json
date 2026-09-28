@@ -2,9 +2,9 @@
   "platforms": ["polymarket", "kalshi"],
   "mode": "none",
   "model": "qwen3.8-flash",
-  "limit": 20,
-  "db": "ARTI/arti.sqlite3",
-  "output": "ARTI/report.json",
+  "limit": 5,
+  "db": "arti.sqlite3",
+  "output": "report.json",
   "jump_pp": 8,
   "poll_count": 1,
   "interval": 300
